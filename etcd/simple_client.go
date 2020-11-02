@@ -11,10 +11,10 @@ import (
 	"github.com/coreos/etcd/client"
 )
 
-var (
-	retryCycles = 2
-	retrySleep  = 200 * time.Millisecond
-)
+// var (
+// 	retryCycles = 2
+// 	retrySleep  = 200 * time.Millisecond
+// )
 
 // Getter describes the Get behavior of an Etcd client.
 //
@@ -53,22 +53,21 @@ type GetterSetter interface {
 // 	- retrySleep (time.Duration): How long to sleep between retries
 //
 // Returns:
-// 	This puts a simpleEtcdClient into context (implements Getter, Setter, etc.)
+// 	This puts a SimpleEtcdClient into context (implements Getter, Setter, etc.)
 func CreateSimpleClient(c cookoo.Context, p *cookoo.Params) (interface{}, cookoo.Interrupt) {
 	r, e := CreateClient(c, p)
 	if e != nil {
 		return c, e
 	}
 
-	return &simpleEtcdClient{
+	return &SimpleEtcdClient{
 		realClient: r.(client.Client),
 	}, nil
 }
 
-// Provides a simple wrapper around the old API.
-//
+// NewSimpleClient provides a simple wrapper around the old API.
 // DO NOT USE for new code. Instead, use NewClient().
-func NewSimpleClient(hosts []string) (*simpleEtcdClient, error) {
+func NewSimpleClient(hosts []string) (*SimpleEtcdClient, error) {
 	cfg := client.Config{
 		Endpoints: hosts,
 	}
@@ -78,29 +77,32 @@ func NewSimpleClient(hosts []string) (*simpleEtcdClient, error) {
 		return nil, err
 	}
 
-	return &simpleEtcdClient{
+	return &SimpleEtcdClient{
 		realClient: r,
 	}, nil
 }
 
-// simpleEtcdClient provides an interface compatible with the old Etcd client.
-type simpleEtcdClient struct {
+// SimpleEtcdClient provides an interface compatible with the old Etcd client.
+type SimpleEtcdClient struct {
 	realClient client.Client
 }
 
-func (c *simpleEtcdClient) Get(key string, sort bool, rec bool) (*client.Response, error) {
+// Get is the getter for the key's value
+func (c *SimpleEtcdClient) Get(key string, sort bool, rec bool) (*client.Response, error) {
 	k := client.NewKeysAPI(c.realClient)
 	return k.Get(dctx(), key, &client.GetOptions{Sort: sort, Recursive: rec})
 }
 
-func (c *simpleEtcdClient) Set(key, val string, ttl uint64) (*client.Response, error) {
+// Set is the setter for the key and value pair
+func (c *SimpleEtcdClient) Set(key, val string, ttl uint64) (*client.Response, error) {
 	k := client.NewKeysAPI(c.realClient)
 	// We're banking on people not using really uge ttls. In the code base, the
 	// highest is only a few hundred.
 	return k.Set(dctx(), key, val, &client.SetOptions{TTL: time.Duration(ttl) * time.Second})
 }
 
-func (c *simpleEtcdClient) CreateDir(name string, ttl uint64) (*client.Response, error) {
+// CreateDir creates a new directory on the etcd
+func (c *SimpleEtcdClient) CreateDir(name string, ttl uint64) (*client.Response, error) {
 	k := client.NewKeysAPI(c.realClient)
 	return k.Set(dctx(), name, "", &client.SetOptions{TTL: time.Duration(ttl) * time.Second, Dir: true})
 }

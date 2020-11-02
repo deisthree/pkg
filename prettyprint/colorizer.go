@@ -163,7 +163,7 @@ func Overwritef(msg string, args ...interface{}) string {
 	return Overwrite(fmt.Sprintf(msg, args...))
 }
 
-// PrettyTabs formats a map with with alligned keys and values.
+// PrettyTabs formats a map with with aligned keys and values.
 //
 // Example:
 // test := map[string]string {

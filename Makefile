@@ -2,7 +2,10 @@
 # Some uses for short name:
 # - Docker image name
 # - Kubernetes service, rc, pod, secret, volume names
+REPO_PATH := github.com/teamhephy/pkg
 SHORT_NAME := pkg
+DEV_ENV_IMAGE := hephy/go-dev:v1.28.3
+DEV_ENV_WORK_DIR := /go/src/${REPO_PATH}
 
 # Enable vendor/ directory support.
 export GO15VENDOREXPERIMENT=1
@@ -12,18 +15,25 @@ export GO15VENDOREXPERIMENT=1
 VERSION := 0.0.1-$(shell date "+%Y%m%d%H%M%S")
 
 # Common flags passed into Go's linker.
-LDFLAGS := "-s -X main.version=${VERSION}"
+PKG_DIRS := ./...
+DEV_ENV_CMD := docker run --rm -v ${CURDIR}:${DEV_ENV_WORK_DIR} -w ${DEV_ENV_WORK_DIR} ${DEV_ENV_IMAGE}
 
-NV_PKGS := $(shell glide nv)
+bootstrap:
+	${DEV_ENV_CMD} go mod vendor
 
 all: build test
 
 # This builds .a files, which will be placed in $GOPATH/pkg
 build:
-	go build ${NV_PKGS}
+	${DEV_ENV_CMD} go build ${PKG_DIRS}
 
-test:
-	go test ${NV_PKGS}
+test: test-style
+	${DEV_ENV_CMD} go test ${PKG_DIRS}
 
+test-style:
+	${DEV_ENV_CMD} lint --deadline
+
+test-cover:
+	${DEV_ENV_CMD} test-cover.sh
 
 .PHONY: all build test
