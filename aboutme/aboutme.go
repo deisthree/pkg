@@ -11,17 +11,18 @@
 package aboutme
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	v1 "k8s.io/api/core/v1"
 )
 
 // DefaultNamespace is the Kubernetes default namespace.
@@ -38,8 +39,9 @@ var (
 	EnvName = "POD_NAME"
 )
 
+// Me is the object of the pod's information
 type Me struct {
-	ApiServer, Name                      string
+	APIServer, Name                      string
 	IP, NodeIP, Namespace, SelfLink, UID string
 	Labels                               map[string]string
 	Annotations                          map[string]string
@@ -64,7 +66,7 @@ func FromEnv() (*Me, error) {
 	url := proto + "://" + host + ":" + port
 
 	me := &Me{
-		ApiServer: url,
+		APIServer: url,
 		Name:      name,
 		Namespace: NamespaceFromEnv(),
 	}
@@ -83,7 +85,7 @@ func FromEnv() (*Me, error) {
 		return me, err
 	}
 
-	return me, nil
+	return me, err
 }
 
 // Client returns an initialized Kubernetes API client.
@@ -122,7 +124,7 @@ func NamespaceFromEnv() string {
 // 	- Annotations become MY_ANNOTATION_[NAME] = [value]
 func (me *Me) ShuntEnv() {
 	env := map[string]string{
-		"MY_APISERVER": me.ApiServer,
+		"MY_APISERVER": me.APIServer,
 		"MY_NAME":      me.Name,
 		"MY_IP":        me.IP,
 		"MY_NODEIP":    me.NodeIP,
@@ -156,7 +158,7 @@ func (me *Me) init() error {
 	me.SelfLink = p.SelfLink
 	me.UID = string(p.UID)
 	me.Labels = p.Labels
-	me.Annotations = me.Annotations
+	me.Annotations = p.Annotations
 
 	// FIXME: It appears that sometimes the k8s API server does not set the
 	// PodIP, even though the pod is issued an IP. We need to figure out why,
@@ -174,7 +176,7 @@ func (me *Me) init() error {
 // loadPod loads a pod using the downward API.
 func (me *Me) loadPod() (*v1.Pod, string, error) {
 	ns := NamespaceFromEnv()
-	p, err := me.c.CoreV1().Pods(ns).Get(me.Name, metav1.GetOptions{})
+	p, err := me.c.CoreV1().Pods(ns).Get(context.TODO(), me.Name, metav1.GetOptions{})
 	return p, ns, err
 }
 
@@ -188,12 +190,12 @@ func (me *Me) findPodInNamespaces(selector string) (*v1.Pod, string, error) {
 	// Get the deis namespace. If it does not exist, get the default namespce.
 	s, err := labels.Parse(selector)
 	if err == nil {
-		ns, err := me.c.CoreV1().Namespaces().List(metav1.ListOptions{LabelSelector: s.String()})
+		ns, err := me.c.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: s.String()})
 		if err != nil {
 			return nil, "default", err
 		}
 		for _, n := range ns.Items {
-			p, err := me.c.CoreV1().Pods(n.Name).Get(me.Name, metav1.GetOptions{})
+			p, err := me.c.CoreV1().Pods(n.Name).Get(context.TODO(), me.Name, metav1.GetOptions{})
 
 			// If there is no error, we got a matching pod.
 			if err == nil {
@@ -203,7 +205,7 @@ func (me *Me) findPodInNamespaces(selector string) (*v1.Pod, string, error) {
 	}
 
 	// If we get here, it's really the last ditch.
-	p, err := me.c.CoreV1().Pods("default").Get(me.Name, metav1.GetOptions{})
+	p, err := me.c.CoreV1().Pods("default").Get(context.TODO(), me.Name, metav1.GetOptions{})
 	return p, "default", err
 }
 
@@ -230,6 +232,8 @@ func MyIP() (string, error) {
 
 	return "0.0.0.0", err
 }
+
+// IPByInterface is used to get ip by device interface
 func IPByInterface(name string) (string, error) {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
@@ -248,7 +252,7 @@ func IPByInterface(name string) (string, error) {
 		}
 	}
 	if len(ip) == 0 {
-		return ip, errors.New("Found no IPv4 addresses.")
+		return ip, errors.New("found no IPv4 addresses")
 	}
 	return ip, nil
 }
