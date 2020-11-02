@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Masterminds/cookoo"
-	"github.com/coreos/etcd/client"
+	clientv3 "github.com/coreos/etcd/clientv3"
 )
 
 func TestCreateClient(t *testing.T) {
@@ -19,7 +19,7 @@ func TestCreateClient(t *testing.T) {
 	}
 
 	// All we really want to know is whether we got a valid client back.
-	_ = cxt.Get("res", nil).(client.Client)
+	_ = cxt.Get("res", nil).(*clientv3.Client)
 }
 
 func TestResponse(t *testing.T) {
